@@ -1,0 +1,53 @@
+﻿FUNCTION_BLOCK "G120_ProfiSafe"
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : SIEMENS
+FAMILY : DRIVES
+NAME : SINA_SPD_TLG352
+VERSION : 1.0
+   VAR_INPUT 
+      Safety : Bool;
+      FQBad : Bool;
+      FAckReq : Bool;
+      Ack : Bool;
+      State_STO : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      "F-AckReq" : Bool;
+      "F-AckRei" : Bool;
+      "F-STO" : Bool;
+      STO_active : Bool;
+   END_VAR
+
+
+BEGIN
+	
+	//Aciona bit de segurança do inversor
+	IF #Safety AND NOT #FQBad AND NOT #FAckReq THEN
+	    #"F-STO" := TRUE;
+	ELSE
+	    #"F-STO" := FALSE;
+	END_IF;
+	
+	//Ativa reconhecimento de falha de segurança no inversor
+	IF #Ack AND #FQBad AND #FAckReq THEN
+	    #"F-AckRei" := TRUE;
+	ELSE
+	    #"F-AckRei" := FALSE;
+	END_IF;
+	
+	//Envia bit de requisição de reset de segurança
+	IF #FAckReq THEN
+	    #"F-AckReq" := TRUE;
+	ELSE
+	    #"F-AckReq" := FALSE;
+	END_IF;
+	
+	//Feedback do inversor de segurança ok
+	IF #State_STO THEN
+	    #STO_active := TRUE;
+	ELSE
+	    #STO_active := FALSE;
+	END_IF;
+END_FUNCTION_BLOCK
+
