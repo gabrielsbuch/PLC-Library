@@ -1,0 +1,82 @@
+﻿FUNCTION_BLOCK "FB_analogic_input"
+TITLE = Speed control S7 to SINAMICS using Standardtelegram 352
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : SIEMENS
+FAMILY : DRIVES
+NAME : SINA_SPD_TLG352
+VERSION : 1.0
+//The function block SINA_SPEED_TLG352 controls a SINAMICS drive using SIEMENS telegram 352
+   VAR_INPUT 
+      HWIDZSW : HW_IO;   // Hardware Identifer actual value slot
+   END_VAR
+
+   VAR_OUTPUT 
+      "analogic_In 1" : Real;
+      "analogic_In 2" : Real;
+      "analogic_In 3" : Real;
+      "analogic_In 4" : Real;
+   END_VAR
+
+   VAR 
+      diagId : Int;   // Error codes of the system function blocks DPWR / DPRD_DAT
+      ai1 : Struct
+         normx_min : DInt := 0;
+         normx_max : DInt := 27648;
+         scalex_min : DInt := 0;
+         scalex_max : DInt := 100;
+      END_STRUCT;
+      ai2 : Struct
+         normx_min : DInt := 0;
+         normx_max : DInt := 27648;
+         scalex_min : DInt := 0;
+         scalex_max : DInt := 100;
+      END_STRUCT;
+      ai3 : Struct
+         normx_min : DInt := 0;
+         normx_max : DInt := 27648;
+         scalex_min : DInt := 0;
+         scalex_max : DInt := 100;
+      END_STRUCT;
+      ai4 : Struct
+         normx_min : DInt := 0;
+         normx_max : DInt := 27648;
+         scalex_min : DInt := 0;
+         scalex_max : DInt := 100;
+      END_STRUCT;
+   END_VAR
+
+   VAR_TEMP 
+      tempRecvBuf : Array[0..3] of Word;   // Receive buffer
+      aux_ai1 : Real;
+      aux_ai2 : Real;
+      aux_ai3 : Real;
+      aux_ai4 : Real;
+   END_VAR
+
+
+BEGIN
+	// Receive telegram from drive
+	#diagId := DPRD_DAT(LADDR := #HWIDZSW,
+	                    RECORD => #tempRecvBuf);
+	
+	// Analyse ZSW1
+	
+	//AI 1
+	#aux_ai1 := NORM_X(MIN := #ai1.normx_min, VALUE := #tempRecvBuf[0], MAX := #ai1.normx_max);
+	#"analogic_In 1" := SCALE_X(MIN := #ai1.scalex_min, VALUE := #aux_ai1, MAX := #ai1.scalex_max);
+	
+	//AI 2
+	#aux_ai2 := NORM_X(MIN := #ai2.normx_min, VALUE := #tempRecvBuf[1], MAX := #ai2.normx_max);
+	#"analogic_In 2" := SCALE_X(MIN := #ai2.scalex_min, VALUE := #aux_ai2, MAX := #ai2.scalex_max);
+	
+	
+	//AI 3
+	#aux_ai3 := NORM_X(MIN := #ai3.normx_min, VALUE := #tempRecvBuf[2], MAX := #ai3.normx_max);
+	#"analogic_In 3" := SCALE_X(MIN := #ai3.scalex_min, VALUE := #aux_ai3, MAX := #ai3.scalex_max);
+	
+	
+	//AI 1
+	#aux_ai4 := NORM_X(MIN := #ai4.normx_min, VALUE := #tempRecvBuf[3], MAX := #ai4.normx_max);
+	#"analogic_In 4" := SCALE_X(MIN := #ai4.scalex_min, VALUE := #aux_ai4, MAX := #ai4.scalex_max);
+END_FUNCTION_BLOCK
+

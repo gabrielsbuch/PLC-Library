@@ -1,0 +1,179 @@
+﻿FUNCTION_BLOCK "FB_mapping_digital_input"
+TITLE = Speed control S7 to SINAMICS using Standardtelegram 352
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : SIEMENS
+FAMILY : DRIVES
+NAME : SINA_SPD_TLG352
+VERSION : 1.0
+//The function block SINA_SPEED_TLG352 controls a SINAMICS drive using SIEMENS telegram 352
+   VAR_INPUT 
+      HWIDZSW : HW_IO;   // Hardware Identifer actual value slot
+   END_VAR
+
+   VAR_OUTPUT RETAIN
+      "input 1" : Bool := true;
+      "input 2" : Bool := true;
+      "input 3" : Bool := true;
+      "input 4" : Bool := true;
+      "input 5" : Bool := true;
+      "input 6" : Bool := true;
+      "input 7" : Bool := true;
+      "input 8" : Bool := true;
+      "input 9" : Bool := true;
+      "input 10" : Bool := true;
+      "input 11" : Bool := true;
+      "input 12" : Bool := true;
+      "input 13" : Bool := true;
+      "input 14" : Bool := true;
+      "input 15" : Bool := true;
+      "input 16" : Bool := true;
+   END_VAR
+
+   VAR 
+      diagId : Int;   // Error codes of the system function blocks DPWR / DPRD_DAT
+      invrt_1 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool := true;
+      invrt_2 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_3 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool := true;
+      invrt_4 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_5 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_6 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_7 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_8 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_9 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_10 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_11 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_12 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_13 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_14 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_15 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      invrt_16 { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      tempRecvBuf : Word;   // Receive buffer
+   END_VAR
+
+
+BEGIN
+	
+	// Receive telegram from drive
+	#diagId := DPRD_DAT(LADDR := #HWIDZSW,
+	                    RECORD => #tempRecvBuf);
+	
+	
+	// Analyse ZSW1
+	// 
+	//Mapeamento da entrada 1 (0.0)
+	IF (#tempRecvBuf.%X8 AND NOT #invrt_1) OR (NOT #tempRecvBuf.%X8 AND #invrt_1) THEN
+	    #"input 1" := true;
+	ELSE
+	    #"input 1" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 2 (0.1)
+	IF (#tempRecvBuf.%X9 AND NOT #invrt_2) OR (NOT #tempRecvBuf.%X9 AND #invrt_2) THEN
+	    #"input 2" := true;
+	ELSE
+	    #"input 2" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 3 (0.2)
+	IF (#tempRecvBuf.%X10 AND NOT #invrt_3) OR (NOT #tempRecvBuf.%X10 AND #invrt_3) THEN
+	    #"input 3" := true;
+	ELSE
+	    #"input 3" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 4 (0.3)
+	IF (#tempRecvBuf.%X11 AND NOT #invrt_4) OR (NOT #tempRecvBuf.%X11 AND #invrt_4) THEN
+	    #"input 4" := true;
+	ELSE
+	    #"input 4" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 5 (0.4)
+	IF (#tempRecvBuf.%X12 AND NOT #invrt_5) OR (NOT #tempRecvBuf.%X12 AND #invrt_5) THEN
+	    #"input 5" := true;
+	ELSE
+	    #"input 5" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 6 (0.5)
+	IF (#tempRecvBuf.%X13 AND NOT #invrt_6) OR (NOT #tempRecvBuf.%X13 AND #invrt_6) THEN
+	    #"input 6" := true;
+	ELSE
+	    #"input 6" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 7 (0.6)
+	IF (#tempRecvBuf.%X14 AND NOT #invrt_7) OR (NOT #tempRecvBuf.%X14 AND #invrt_7) THEN
+	    #"input 7" := true;
+	ELSE
+	    #"input 7" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 8 (0.7)
+	IF (#tempRecvBuf.%X15 AND NOT #invrt_8) OR (NOT #tempRecvBuf.%X15 AND #invrt_8) THEN
+	    #"input 8" := true;
+	ELSE
+	    #"input 8" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 9 (1.0)
+	IF (#tempRecvBuf.%X0 AND NOT #invrt_9) OR (NOT #tempRecvBuf.%X0 AND #invrt_9) THEN
+	    #"input 9" := true;
+	ELSE
+	    #"input 9" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 10 (1.1)
+	IF (#tempRecvBuf.%X1 AND NOT #invrt_10) OR (NOT #tempRecvBuf.%X1 AND #invrt_10) THEN
+	    #"input 10" := true;
+	ELSE
+	    #"input 10" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 11 (1.2)
+	IF (#tempRecvBuf.%X2 AND NOT #invrt_11) OR (NOT #tempRecvBuf.%X2 AND #invrt_11) THEN
+	    #"input 11" := true;
+	ELSE
+	    #"input 11" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 12 (1.3)
+	IF (#tempRecvBuf.%X3 AND NOT #invrt_12) OR (NOT #tempRecvBuf.%X3 AND #invrt_12) THEN
+	    #"input 12" := true;
+	ELSE
+	    #"input 12" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 13 (1.4)
+	IF (#tempRecvBuf.%X4 AND NOT #invrt_13) OR (NOT #tempRecvBuf.%X4 AND #invrt_13) THEN
+	    #"input 13" := true;
+	ELSE
+	    #"input 13" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 14 (1.5)
+	IF (#tempRecvBuf.%X5 AND NOT #invrt_14) OR (NOT #tempRecvBuf.%X5 AND #invrt_14) THEN
+	    #"input 14" := true;
+	ELSE
+	    #"input 14" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 15 (1.6)
+	IF (#tempRecvBuf.%X6 AND NOT #invrt_15) OR (NOT #tempRecvBuf.%X6 AND #invrt_15) THEN
+	    #"input 15" := true;
+	ELSE
+	    #"input 15" := false;
+	END_IF;
+	
+	//Mapeamento da entrada 16 (1.7)
+	IF (#tempRecvBuf.%X7 AND NOT #invrt_16) OR (NOT #tempRecvBuf.%X7 AND #invrt_16) THEN
+	    #"input 16" := true;
+	ELSE
+	    #"input 16" := false;
+	END_IF;
+	
+END_FUNCTION_BLOCK
+
