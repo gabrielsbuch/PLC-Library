@@ -1,0 +1,133 @@
+TYPE "DT_Simple_motor"
+VERSION : 0.1
+   STRUCT
+      ready : Bool;   // motor ready
+      fault : Bool;   // motor fault
+      djm : Bool;   // circuit brake
+      km : Bool;   // contactor motor
+      fault_djm : Bool;   // fault circuit brake
+      fault_feedback : Bool;   // fault feedback on
+      motor_running : Bool;   // status motor running
+      auto_activated : Bool;   // automatic activated forward
+      manual_activated : Bool;   // manual activated forward
+      output_motor : Bool;   // activated output forward
+      delay_starting : Int;   // delay for starting motor - seconds
+      "timer" {InstructionName := 'TON_TIME'; LibVersion := '1.0'; S7_SetPoint := 'False'} : Array[0..2] of TON_TIME;
+   END_STRUCT;
+
+END_TYPE
+
+FUNCTION_BLOCK "FB_simple_motor"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      safety { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;   // safety
+      auto_selected { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;   // 0=manual/1= automatic
+      reset { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;   // reset
+   END_VAR
+
+   VAR_IN_OUT 
+      motor : "DT_Simple_motor";
+   END_VAR
+
+   VAR_TEMP 
+      aux_delay_starting : Time;
+      aux_timer : Array[0..2] of Bool;
+   END_VAR
+
+
+BEGIN
+	//=============================================================================
+	//CONTROL SIMPLE MOTOR WITH CONTACTOR AND ONE DIRECTION
+	//Version  Date     
+	//07.04.2025
+	//Developed by Gabriel S Buch
+	//=============================================================================
+	
+	REGION Timer operations
+	    
+	    //Convert delay startig seconds for miliseconds
+	    #aux_delay_starting := INT_TO_TIME(#motor.delay_starting * 1000);
+	    
+	    //Delay starting
+	    #motor.timer[0].TON(IN := #motor.output_motor,
+	                        PT := #aux_delay_starting,
+	                        Q => #aux_timer[0]);
+	    
+	    //reserved
+	    #motor.timer[1].TON(IN := 0,
+	                        PT := t#0ms,
+	                        Q => #aux_timer[1]);
+	    
+	    //reserved
+	    #motor.timer[2].TON(IN := 0,
+	                        PT := t#0ms,
+	                        Q => #aux_timer[2]);
+	    
+	END_REGION ;
+	
+	REGION Motor ready
+	    //motor ready
+	    IF #safety AND NOT #motor.fault THEN
+	        #motor.ready := true;
+	    ELSE
+	        #motor.ready := false;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	REGION Feedback motor running
+	    
+	    IF #motor.km AND #motor.km AND #motor.output_motor THEN
+	       #motor.motor_running := TRUE;
+	    ELSE
+	       #motor.motor_running := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	REGION Turn on motor
+	    
+	    //Turn on forkward motor
+	    IF (#motor.ready AND #auto_selected AND #motor.auto_activated) OR //automatic
+	       (#motor.ready AND NOT #auto_selected AND #motor.manual_activated) THEN //manual
+	        #motor.output_motor := TRUE;
+	    ELSE
+	        #motor.output_motor := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	REGION Fault motor
+	    
+	    //Fault starting and not feedback
+	    IF (#aux_timer[0] AND NOT #motor.motor_running AND #motor.output_motor_bwd) OR
+	       (#aux_timer[0] AND NOT #motor.motor_running AND #motor.output_motor) THEN
+	        #motor.fault_feedback := TRUE;
+	    END_IF;
+	    
+	    //Fault circuit break
+	    IF NOT #motor.djm THEN
+	        #motor.fault_djm := TRUE;
+	    END_IF;
+	    
+	    //Motor general fault
+	    IF #motor.fault_djm OR #motor.fault_feedback THEN
+	        #motor.fault := TRUE;
+	    END_IF;
+	    
+	    //reset faults
+	    IF #reset THEN
+	        #motor.fault_djm := FALSE;
+	        #motor.fault_feedback := FALSE;
+	        #motor.fault := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	//Reset manual activad when automatic selected or motor fault
+	IF #auto_selected OR #motor.fault THEN
+	    #motor.manual_activated := FALSE;
+	END_IF;
+END_FUNCTION_BLOCK
+
