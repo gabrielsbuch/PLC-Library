@@ -1,0 +1,96 @@
+﻿FUNCTION_BLOCK "FBproportional_speed"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      setpoint : DInt;   // value desired
+      process_value : DInt;   // actual value
+      gain : Real;   // Ganho proporcional/resposta
+      low_speed : DInt;   // Velocidade mínima (%)
+      high_speed : DInt;
+   END_VAR
+
+   VAR_OUTPUT 
+      speed : DInt;   //  Saída final 0–100%
+   END_VAR
+
+   VAR 
+      alpha : Real := 0.1;
+   END_VAR
+
+   VAR_TEMP 
+      error_proportional : Real;
+      aux_error_prop : Real;
+      speed_Calc : Real;
+      speed_Filtred : Real;
+      aux_lowSpeed : Real;
+      aux_highSpeed : Real;
+   END_VAR
+
+
+BEGIN
+	//=============================================================================
+	//CONTROL PROPORTIONAL SPEED
+	//Version  Date     
+	//10.02.2026
+	//Developed by Gabriel S Buch
+	//=============================================================================
+	//Ajuste fino das configurações
+	// Ganho (#gain) Muito alto → resposta rápida, mas pode oscilar
+	// Ganho (#gain) Muito baixo → resposta lenta
+	
+	//#alpha (#alpha)
+	//0.1 → filtro suave
+	//0.01 → muito suave
+	//0.5 → quase sem filtro
+	//=============================================================================
+	//
+	REGION variables
+	    //convert variables
+	    #aux_lowSpeed := DINT_TO_REAL(#low_speed);
+	    #aux_highSpeed := DINT_TO_REAL(#high_speed);
+	END_REGION ;
+	
+	REGION proportinal_error
+	    // calculate proportional error
+	    #error_proportional := #setpoint - #process_value;
+	    
+	    IF #error_proportional < 0 THEN
+	        #aux_error_prop := ABS(#error_proportional);
+	    ELSE
+	        #aux_error_prop := #error_proportional;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	REGION proportional_control
+	    
+	    //Proportional control
+	    IF #aux_error_prop > 0.0 THEN
+	        #speed_Calc := (#aux_lowSpeed + (#gain * #aux_error_prop));
+	    ELSE
+	        #speed_Calc := #low_speed;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	REGION limit_control
+	    
+	    //Control limit superior
+	    IF #speed_Calc > #aux_highSpeed THEN
+	        #speed_Calc := #high_speed;
+	    END_IF;
+	    
+	    //Control limit inferior
+	    IF #speed_Calc < #aux_lowSpeed THEN
+	        #speed_Calc := #low_speed;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	// Filtro suavizador (exponencial)
+	#speed_Filtred := REAL_TO_DINT(#speed_Filtred + #alpha * (#speed_Calc - #speed_Filtred)*10);
+	        
+	// Output speed
+	#speed := REAL_TO_DINT(#speed_Filtred);
+END_FUNCTION_BLOCK
+
