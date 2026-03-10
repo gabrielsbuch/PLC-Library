@@ -1,0 +1,154 @@
+﻿TYPE "DT_valve_double_action"
+VERSION : 0.1
+   STRUCT
+      sensor_extended : Bool;   // sensor 
+      sensor_retracted : Bool;   // sensor 
+      manual_extended : Bool;   // manual activated
+      manual_retracted : Bool;   // manual activated
+      auto_extended : Bool;   // automatic activated
+      auto_retracted : Bool;   // automatic activated
+      output_extended : Bool;   // output extende
+      output_retracted : Bool;   // outpu retracted
+      fault : Bool;   // general fault
+      fault_position : Bool;   // fault not reach position
+      fault_sensors : Bool;   // fault sensor activated or not activated
+      bypass_error_position : Bool;
+      bypass_error_sensors : Bool;
+      mode : Int;   // 0-out away enable / 1-out enablec reach position  
+      delay_reach_position : Int;   // segundos
+      "timer" {InstructionName := 'TON_TIME'; LibVersion := '1.0'; S7_SetPoint := 'False'} : Array[0..2] of TON_TIME;
+   END_STRUCT;
+
+END_TYPE
+
+FUNCTION_BLOCK "FB_valve_double_action"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      safety { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      reset { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      auto_selected { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+   END_VAR
+
+   VAR_IN_OUT 
+      valve : "DT_valve_double_action";
+   END_VAR
+
+   VAR_TEMP 
+      aux_delay_reach_pos : Time;
+      aux_timer : Array[0..2] of Bool;
+   END_VAR
+
+
+BEGIN
+	//=============================================================================
+	//CONTROL VALVE WITH DOUBLE ACTION - TWO COIL
+	//Version  Date     
+	//10.02.2026
+	//Developed by Gabriel S Buch
+	//=============================================================================
+	// MODE OPERATION AUTOMATIC
+	// 0 - Coil activated when signal on
+	// 1 - Coil activated until it reaches the sensor
+	//Control range mode operation
+	IF #valve.mode >= 1 THEN
+	    #valve.mode := 1;
+	ELSE
+	    #valve.mode := 0;
+	END_IF;
+	    
+	
+	REGION timer_operations
+	    
+	    #aux_delay_reach_pos := INT_TO_TIME(#valve.delay_reach_position * 1000);
+	    
+	    //delay extended valve
+	    #valve.timer[0].TON(IN := #valve.output_extended,
+	                        PT := #aux_delay_reach_pos,
+	                        Q => #aux_timer[0]);
+	    //delay retracted valve
+	    #valve.timer[1].TON(IN := #valve.output_retracted,
+	                        PT := #aux_delay_reach_pos,
+	                        Q => #aux_timer[1]);
+	    
+	END_REGION ;
+	
+	REGION Activated valve
+	        
+	    REGION extended_valve 
+	        
+	        // activated automatic mode 0
+	        IF (#safety AND #auto_selected AND #valve.auto_extended AND NOT #valve.auto_retracted AND #valve.mode = 0) OR
+	            // activated automatic mode 1
+	            (#safety AND #auto_selected AND #valve.auto_extended AND NOT #valve.auto_retracted AND #valve.mode = 1 AND NOT #valve.sensor_extended) OR
+	            // activated manual mode
+	            (#safety AND NOT #auto_selected AND #valve.manual_extended AND NOT #valve.manual_retracted) THEN
+	            #valve.output_extended := TRUE;
+	        ELSE
+	            #valve.output_extended := FALSE;
+	        END_IF;
+	        
+	    END_REGION ;
+	        
+	    REGION retracted_valve
+	        
+	        // activated automatic mode 0
+	        IF (#safety AND #auto_selected AND #valve.auto_retracted AND NOT #valve.auto_extended AND #valve.mode = 0) OR
+	            // activated automatic mode 1
+	            (#safety AND #auto_selected AND #valve.auto_retracted AND NOT #valve.auto_extended AND #valve.mode = 1 AND NOT #valve.sensor_retracted) OR
+	            // activated manual mode
+	            (#safety AND NOT #auto_selected AND #valve.manual_retracted AND NOT #valve.manual_extended) THEN
+	            #valve.output_retracted := TRUE;
+	        ELSE
+	            #valve.output_retracted := FALSE;
+	        END_IF;
+	        
+	    END_REGION ;
+	    
+	END_REGION ;
+	
+	REGION fault
+	   
+	    //Fault - valve not reach position
+	    IF (#valve.timer[0].Q AND NOT #valve.sensor_extended AND NOT #valve.bypass_error_position) OR
+	        (#valve.timer[1].Q AND NOT #valve.sensor_retracted AND NOT #valve.bypass_error_position) THEN
+	        #valve.fault_position := TRUE;
+	    END_IF;
+	    
+	    
+	    //Fault both sensor enabled or disabled
+	    #valve.timer[2].TON(IN := (#valve.sensor_retracted AND #valve.sensor_extended  AND NOT #valve.bypass_error_sensors) OR
+	                        (NOT #valve.sensor_retracted AND NOT #valve.sensor_extended AND NOT #valve.bypass_error_sensors),
+	                        PT := #aux_delay_reach_pos,
+	                          Q => #aux_timer[2]);
+	    
+	    IF #valve.timer[2].Q THEN
+	        #valve.fault_sensors := TRUE;
+	        
+	    END_IF;
+	    
+	    
+	    //general fault
+	    IF #valve.fault_position OR #valve.fault_sensors THEN
+	        #valve.fault := TRUE;
+	    ELSE
+	        #valve.fault := FALSE;
+	    END_IF;
+	    
+	    
+	    //reset fault
+	    IF #reset THEN
+	        #valve.fault_position := FALSE;
+	        #valve.fault_sensors := FALSE;
+	        #valve.fault := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	//Reset activated manual when safety off or mode selected or fault
+	IF #auto_selected OR NOT #safety THEN
+	    #valve.manual_extended := FALSE;
+	    #valve.manual_retracted := FALSE;
+	END_IF;
+END_FUNCTION_BLOCK
+
