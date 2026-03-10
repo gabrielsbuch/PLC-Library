@@ -1,0 +1,67 @@
+FUNCTION_BLOCK "FB_profinet_commom_state"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      HW_device { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : HW_DEVICE;
+   END_VAR
+
+   VAR_OUTPUT 
+      ready { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      fault { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      ret_value : Int;
+      mode : UInt;
+      state : Array[0..7] of Bool;
+   END_VAR
+
+
+BEGIN
+	//=============================================================================
+	//VERIFY STATE COMMUNICATION WITH DEVICES PROFINET - GSDML
+	//Version  Date     
+	//05.02.2024
+	//Developed by Gabriel S Buch
+	//=============================================================================
+	
+	//****************************************** MODE OPERATION ******************************************
+	//MODE OPERATION
+	//1   Device #state
+	//2   Module #state
+	//3   Submodule #state
+	//5   Detailed module diagnostic #state
+	
+	#mode := 5;
+	
+	//****************************************** READ DEVICE STATE ******************************************
+	
+	#ret_value := ModuleStates(LADDR := #HW_device, MODE := #mode, STATE := #state);
+	
+	//****************************************** WRITE STATE TO OUTPUS ******************************************
+	//STATE BITs
+	//#state[0]    Module OK
+	//#state[1]    Module fault
+	//#state[2]    Maintenance required
+	//#state[3]    Maintenance demanded
+	//#state[4]    Module disabled
+	//#state[5]    Hardware problem
+	//#state[6]    Configuration fault
+	//#state[7]    Communication error
+	
+	IF #state[0] THEN
+	    #ready := TRUE;
+	ELSE
+	    #ready := FALSE;
+	END_IF;
+	
+	
+	//Verify bit state fault
+	IF #state[1] THEN
+	    #fault := TRUE;
+	ELSE
+	    #fault := FALSE;
+	END_IF;
+	
+END_FUNCTION_BLOCK
+
