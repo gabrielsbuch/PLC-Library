@@ -1,0 +1,158 @@
+﻿FUNCTION_BLOCK "FB_transf_zone_to_zone"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      safety { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      reset : Bool;
+      auto_select { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      drivers_ok { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      sensor_pos : Bool;
+      sensor_next : Bool;
+      prev_transf_started : Bool;
+      next_transf_started : Bool;
+      next_zone_ready : Bool;
+      timeOut : Time;
+   END_VAR
+
+   VAR_OUTPUT 
+      started { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      turn_on_motors { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      error { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      error_both_sen { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+      error_timeout { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+   END_VAR
+
+   VAR 
+      step { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : DInt;
+      timeout_error {InstructionName := 'TON_TIME'; LibVersion := '1.0'; ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'; S7_SetPoint := 'False'} : TON_TIME;
+      delay {InstructionName := 'TON_TIME'; LibVersion := '1.0'; ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'; S7_SetPoint := 'False'} : Array[0..3] of TON_TIME;
+   END_VAR
+
+   VAR_TEMP 
+      aux_step10 : Bool;
+      aux_step20 : Bool;
+      aux_step30 : Bool;
+   END_VAR
+
+
+BEGIN
+	REGION sequence transferene
+	    //#step 0 - Wait safety ready
+	    IF #step = 0 AND #safety THEN
+	        #step := 10;
+	    END_IF;
+	    
+	    //#step 10 - wait condions ok for start transference
+	    IF #step = 10 AND #safety AND #auto_select AND #sensor_pos AND NOT #sensor_next AND NOT #error
+	        AND #drivers_ok AND #next_zone_ready AND NOT #prev_transf_started AND NOT #next_transf_started THEN
+	        #aux_step10 := TRUE;
+	        
+	        IF #delay[0].Q THEN
+	            #step := 20;
+	        END_IF;
+	        
+	    ELSE
+	        #aux_step10 := FALSE;
+	    END_IF;
+	    
+	    //#step 20 - Delay for started transference
+	    IF #step = 20 AND #safety AND #auto_select THEN
+	        #aux_step20 := TRUE;
+	        
+	        IF #delay[1].Q THEN
+	            #step := 30;
+	        END_IF;
+	        
+	    ELSE
+	        #aux_step20 := FALSE;
+	    END_IF;
+	    
+	    //#step 30 - Wait pallet to next zone and finish transference
+	    IF #step = 30 AND #auto_select AND #sensor_next AND NOT #error THEN
+	        #aux_step30 := TRUE;
+	        
+	        IF #delay[2].Q THEN
+	            #step := 0;
+	        END_IF;
+	        
+	    ELSE
+	        #aux_step30 := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	
+	REGION signals_transference
+	    
+	    //signal transference active
+	    IF #step >= 20 AND #step <= 30 THEN
+	        #started := TRUE;
+	    ELSE
+	        #started := FALSE;
+	    END_IF;
+	    
+	    //signal for turn on conveyors
+	    IF #safety AND #auto_select AND  #step = 30 THEN
+	        #turn_on_motors := TRUE;
+	    ELSE
+	        #turn_on_motors := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	
+	REGION error
+	    
+	    //timeOut transference. Return for step 0 
+	    IF #timeout_error.Q THEN
+	        #error_timeout := TRUE;
+	        #step := 0;
+	    END_IF;
+	    
+	    
+	    //error all sensors postion actived
+	    IF #delay[3].Q THEN
+	        #error_both_sen := TRUE;
+	    END_IF;
+	    
+	    //general error
+	    IF #error_both_sen OR #error_timeout THEN
+	        #error := TRUE;
+	    END_IF;
+	    
+	    //reset errors
+	    IF #reset THEN
+	        #error := FALSE;
+	        #error_both_sen := FALSE;
+	        #error_timeout := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	
+	REGION timer_operations
+	    
+	    //delay condition started transference
+	    #delay[0].TON(IN := #aux_step10,
+	                  PT := t#1s);
+	    
+	    //delay turn on motors
+	    #delay[1].TON(IN := #aux_step20,
+	                  PT := t#1s);
+	    
+	    //delay transference done
+	    #delay[2].TON(IN := #aux_step30,
+	                  PT := t#500ms);
+	    
+	    //delay error all sensors postion actived
+	    #delay[3].TON(IN := #started AND #sensor_next AND #sensor_pos,
+	                  PT := T#1s);
+	    
+	    //timeout transference
+	    #timeout_error.TON(IN := #safety AND #auto_select AND #started,
+	                          PT := #timeOut);
+	       
+	END_REGION ;
+	
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,175 @@
+﻿FUNCTION_BLOCK "FB_SpeedPosition"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      safety : Bool;   // safety
+      actual_position : DInt;   // actual position encoder
+      desired_position : DInt;   // position finaly
+      tolerance_pos : DInt;   // tolerance for position ok
+      low_speed : DInt;
+      high_speed : DInt;
+      gain : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      position_ready : Bool;   // position achieved
+      busy : Bool;   // signal searching position
+      forward : Bool;   // move foward
+      backward : Bool;   // move backward
+      speed : DInt;   // output speed for motor
+   END_VAR
+
+   VAR_IN_OUT 
+      reach_position : Bool;   // comand for reach position
+   END_VAR
+
+   VAR 
+      alpha : Real := 0.1;
+      ton {InstructionName := 'TON_TIME'; LibVersion := '1.0'; S7_SetPoint := 'False'} : Array[0..3] of TON_TIME;
+   END_VAR
+
+   VAR_TEMP 
+      calc_positionLimit_min : DInt;   // calculate minimum position
+      calc_positionLimit_max : DInt;   // calculate maximun position
+      aux_position_ready : Bool;
+      error_proportional : Real;
+      aux_error_proportional : Real;
+      aux_lowSpeed : Real;
+      aux_highSpeed : Real;
+      speed_Calc : Real;
+      speed_Filtred : Real;
+   END_VAR
+
+
+BEGIN
+	//=============================================================================
+	//CONTROL POSITION FOR MOTOR WITH ENCODER AND SPEED CONTROL PROPORTIONAL
+	//Version  Date     
+	//05.02.2026
+	//Developed by Gabriel S Buch
+	//=============================================================================
+	
+	
+	//****************************************** POSITION TOLERANCE ******************************************
+	REGION position_tolerance 
+	    
+	    #calc_positionLimit_min := #desired_position - #tolerance_pos;
+	    #calc_positionLimit_max := #desired_position + #tolerance_pos;
+	    
+	END_REGION ;
+	
+	//******************************************** POSITION READY ********************************************
+	REGION position_ready
+	    
+	    IF #actual_position >= #calc_positionLimit_min AND #actual_position <= #calc_positionLimit_max AND
+	        NOT #forward AND NOT #backward THEN
+	        
+	        #position_ready := TRUE;
+	        #reach_position := FALSE;
+	    ELSE
+	        #position_ready := FALSE;
+	    END_IF;
+	    
+	END_REGION ;
+	
+	//******************************************** MOOVING CONTROL *******************************************
+	REGION mooving
+	    
+	    //auxiliary position ready for use stop movement
+	    IF #actual_position >= #calc_positionLimit_min AND #actual_position <= #calc_positionLimit_max THEN
+	        #aux_position_ready := TRUE;
+	    ELSE
+	        #aux_position_ready := FALSE;
+	    END_IF;
+	    
+	    
+	    //comand postioning
+	    IF #safety AND #reach_position AND NOT #aux_position_ready THEN
+	        
+	        //move forward
+	        IF #actual_position < #desired_position AND NOT #backward AND #ton[0].Q THEN
+	            
+	            #forward := TRUE;
+	        ELSE
+	            #forward := FALSE;
+	        END_IF;
+	        
+	        //move backward
+	        IF #actual_position > #desired_position AND NOT #forward AND #ton[1].Q THEN
+	            
+	            #backward := TRUE;
+	        ELSE
+	            #backward := FALSE;
+	        END_IF;
+	        
+	        #busy := TRUE;
+	        
+	    ELSE
+	        
+	        #busy := FALSE;
+	        #backward := FALSE;
+	        #forward := FALSE;
+	        
+	    END_IF;
+	    
+	    
+	    
+	END_REGION ; 
+	
+	//******************************************** SPEED CONTROL *********************************************
+	REGION speed_control
+	    
+	//converte variaveis
+	#aux_lowSpeed := DINT_TO_REAL(#low_speed);
+	#aux_highSpeed := DINT_TO_REAL(#high_speed);
+	
+	// Cálculo do erro
+	#error_proportional := #actual_position - #desired_position;
+	
+	IF #error_proportional < 0 THEN
+	    #aux_error_proportional := ABS(#error_proportional);
+	ELSE
+	    #aux_error_proportional := #error_proportional;
+	END_IF;
+	
+	
+	// Controle proporcional
+	IF #aux_error_proportional > 0.0 THEN
+	    #speed_Calc := (#aux_lowSpeed + (#gain * #aux_error_proportional));
+	ELSE
+	    #speed_Calc := #low_speed;
+	END_IF;
+	
+	// Limite superior 100%
+	IF #speed_Calc > #aux_highSpeed THEN
+	    #speed_Calc := #high_speed;
+	END_IF;
+	
+	// Limite inferior
+	IF #speed_Calc < #aux_lowSpeed THEN
+	    #speed_Calc := #low_speed;
+	END_IF;
+	
+	// Filtro suavizador (exponencial)
+	#speed_Filtred := REAL_TO_DINT(#speed_Filtred + #alpha * (#speed_Calc - #speed_Filtred) * 10);
+	
+	// Saída final
+	#speed := REAL_TO_DINT(#speed_Filtred);
+	
+	END_REGION ;
+	
+	//******************************************* TIMER OPERATIONS *******************************************
+	REGION timer_operation
+	    
+	    //timer backward disable
+	    #ton[0].TON(IN := NOT #backward,
+	                PT := t#500ms);
+	    
+	    //timer forward disable
+	    #ton[1].TON(IN := NOT #forward,
+	                PT := t#500ms);
+	    
+	    
+	END_REGION ;
+END_FUNCTION_BLOCK
+
